@@ -9,8 +9,8 @@
 //
 // Exit 2 feeds the failure back to the agent. The edit has already been
 // written: the hook reports it, and the commit gate is what enforces. A file
-// changed through the shell (`sed`, a heredoc) is not seen here; the commit
-// gate catches it.
+// changed through the shell (`sed`, a heredoc, a script) gets the same checks
+// from check-after-bash.mjs.
 
 import { block, editProblems, editedFile, hookInput, readGates } from "./gates.mjs";
 

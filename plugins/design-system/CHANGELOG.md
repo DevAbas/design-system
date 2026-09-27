@@ -7,6 +7,14 @@ A version bump means:
 - **Minor:** a new rule, gate, profile or skill.
 - **Patch:** a fix or a clarification.
 
+## 0.6.1
+
+- **`check-after-bash` is back, and 0.5.1 was wrong to remove it.** 0.5.1 said Claude Code rarely records the files a shell command changes in auto mode. The evidence was the agent's own tool results in one session, where the list is not shown. The transcripts of real auto-mode sessions on a production site show otherwise: every shell edit was recorded in `tool_response.bashEditDiff`, including a `node -e` script that rewrote a token file, `lib/site.ts` and a generated stylesheet in one command. With the hook removed, those edits reached no check before the commit.
+- **Generated outputs are triggers.** When a command changes a generated output, the hook also runs the source checks: the build's own output passes the staleness check, a hand edit fails it. `protect-generated` sees only the Edit and Write tools, so this closes the shell path to a generated file before the commit.
+- **Live proof.** The harness skill asks for an ordinary task that touches a colour, not a deliberate violation: a violation shows only that a hook loads, an ordinary task shows what the agent does with the gates in place.
+
+**Migrating from 0.6.0:** copy `check-after-bash.mjs` and the new `gates.mjs` to `.claude/hooks/design-system/`, and merge the `PostToolUse` `Bash` entry of `assets/harness/core/settings.hooks.json` into `.claude/settings.json`.
+
 ## 0.6.0
 
 The plugin moves to its own repository, `DevAbas/design-system`, and is renamed `design-system`, shown as **Agent-Ready Design System**. The repository will hold more design-system skills; the rubric is still Token Architecture.

@@ -117,10 +117,10 @@ For a stack without a profile, the token and rules checks work as they are. Writ
 
 From `${CLAUDE_PLUGIN_ROOT}/assets/harness/core/`:
 
-1. **Hooks.** Copy `gates.mjs`, `protect-generated.mjs`, `check-on-edit.mjs`, `guard-commit.mjs`, `run-gates.mjs` and `with-node.sh` to `.claude/hooks/design-system/`. Make `with-node.sh` executable. What each hook can do:
+1. **Hooks.** Copy `gates.mjs`, `protect-generated.mjs`, `check-on-edit.mjs`, `check-after-bash.mjs`, `guard-commit.mjs`, `run-gates.mjs` and `with-node.sh` to `.claude/hooks/design-system/`. Make `with-node.sh` executable. What each hook can do:
    - `protect-generated` (PreToolUse, Edit and Write) denies an edit to a generated output before it happens.
-   - `check-on-edit` (PostToolUse, Edit and Write) runs after the file is written. It reports the failure to the agent; it cannot undo the write.
-   - A file changed through the shell (`sed`, a heredoc, a script) reaches no edit hook. The commit gate (`guard-commit`, the pre-commit hook and CI) is what catches it, and what enforces every rule.
+   - `check-on-edit` (PostToolUse, Edit and Write) and `check-after-bash` (PostToolUse, Bash) run after the file is written. They report the failure to the agent; they cannot undo the write. The commit gate is what enforces.
+   - `check-after-bash` reads the files a shell command changed (`sed`, a heredoc, a `node -e` script) from Claude Code's `tool_response.bashEditDiff` (v2.1.269 or later, public beta). Claude Code records it in auto and bypassPermissions mode when it has the agent edit through Bash, and in every mode when the person's own settings set `bashEditDiffEnabled: true`, which a project's settings cannot turn on (https://code.claude.com/docs/en/settings-reference). A command that changes a generated output also runs the source checks, so a shell write to it fails the staleness check at once. Without the list the hook passes, and the commit gate still holds.
 2. **Settings.** Merge `settings.hooks.json` into `.claude/settings.json`. Show the merged `hooks` object and wait for approval: settings change what runs on every edit.
 3. **Pre-commit.** Add `pre-commit` to the project's git hooks. If a pre-commit hook exists, add its last line to that hook instead. Ask before changing `core.hooksPath` or `package.json`.
 4. **CI (optional).** Copy `design-system.yml` to `.github/workflows/`, with the project's Node version and install command. Confirm the action versions in their documentation.
@@ -139,7 +139,7 @@ A gate that never failed is not yet a gate. For each installed gate:
 
 Report each gate as proven, with the command and both results. Leave no violation behind.
 
-A hook run by hand proves its script, not that Claude Code loads it. The hooks load from `.claude/settings.json` when a session starts, so after the commit ask the person to start a new session, approve the hooks, and ask the agent there for one violation per hook: an Edit with `bg-[#fff]`, and an Edit to a generated output. The transcript line of each hook firing is the proof.
+A hook run by hand proves its script, not that Claude Code loads it. The hooks load from `.claude/settings.json` when a session starts, so after the commit ask the person to start a new session, approve the hooks, and give the agent there an ordinary task that touches a colour, without saying it is a test, and read the transcript for each hook that fires. A deliberate violation shows only that a hook is loaded; an ordinary task shows what the agent does with the gates in place. The transcript line of each hook firing is the proof.
 
 ## Step 6: Record
 
