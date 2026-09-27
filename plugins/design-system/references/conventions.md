@@ -23,6 +23,8 @@ DTCG does not prescribe file names or group names: the spec "defines the format 
       themes/                                only when there are two or more contexts
         <context>.tokens.json                colors.<role> and shadow.<name> for that context
     checks/                                  the checks harness copies from the plugin (check-tokens.mjs, lib/, …)
+    harness/                                 how the gates run: run-gates.mjs (pre-commit, CI and agents call it), gates.mjs
+      claude/                                the Claude Code hooks; .claude/settings.json only points here
     audits/                                  the audit reports, named by UTC stamp
     gates.json                               the gates and the token settings
   <framework path>/theme.css                 the generated output, where the framework reads it (app/, src/styles/)

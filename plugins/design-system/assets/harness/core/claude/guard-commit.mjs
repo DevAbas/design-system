@@ -3,7 +3,7 @@
 // command passes at once. A person's commit runs the same commands through
 // the git pre-commit hook (run-gates.mjs before-commit).
 
-import { block, hookInput, isGitCommit, readGates, runAll } from "./gates.mjs";
+import { block, hookInput, isGitCommit, readGates, runAll } from "../gates.mjs";
 
 if (!isGitCommit(hookInput().tool_input?.command)) process.exit(0);
 const failure = runAll(readGates().beforeCommit, { DESIGN_LINT_STRICT: "1" });

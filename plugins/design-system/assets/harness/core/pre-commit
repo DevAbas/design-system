@@ -10,4 +10,4 @@ if ! command -v node >/dev/null 2>&1; then
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 && nvm use --silent >/dev/null 2>&1
 fi
-node .claude/hooks/design-system/run-gates.mjs before-commit
+node design-system/harness/run-gates.mjs before-commit

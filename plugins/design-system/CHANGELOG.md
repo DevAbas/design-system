@@ -7,6 +7,17 @@ A version bump means:
 - **Minor:** a new rule, gate, profile or skill.
 - **Patch:** a fix or a clarification.
 
+## 0.7.0
+
+The harness lives with the rest of the design system, and an installed one can be upgraded without hand-written notes.
+
+- **Layout.** `design-system/harness/` holds the runner every stage calls (`run-gates.mjs`) and the shared library (`gates.mjs`); `design-system/harness/claude/` holds the Claude Code hooks. Pre-commit and CI call `node design-system/harness/run-gates.mjs before-commit`, not a path under `.claude/`: the core is agent-independent, and another agent's adapters get their own folder beside `claude/`. Outside `design-system/` stay only the files a tool requires: `.claude/settings.json` (pointing into `harness/claude/`), the git hook and `.github/`. A test holds the templates to this.
+- **Upgrading an installed harness** is a section of the harness skill. The scan reports `gates.harnessLayout` (`canonical`, `legacy-0.6`, `legacy-0.5` or null); an older layout is compared with the plugin's current files (the project's adapted lines are kept and shown), moved with `git mv`, repointed, checked with `git grep` for any old path, and proven.
+- **A project with its own harness.** Where a project's own hooks run its gates, harness offers to migrate every check into `gates.json` and the plugin's hooks, each exactly as strict, removing the old files only with approval; or it adds only the missing gates beside them. It never leaves both running the same check. This replaces "new gates never replace what exists", which forced one of those two.
+- **Every gap in the report.** For each partial or missing gate, harness lists every gap the report names and closes it or says why not. A run on a real project had dropped one ("every component has a contract entry").
+
+**Upgrading from 0.6.x:** run `/design-system:harness`; it finds the old layout and follows the upgrade section.
+
 ## 0.6.2
 
 - **CI follows GitHub's own guidance** ("Secure use reference"). The template grants the token read access to contents only, cancels a superseded run, has a time limit, and never uses `pull_request_target`. Harness pins each action to the full commit SHA of its latest release (read with `git ls-remote`, never copied from the plugin), takes the default branch from git, Node from the project's `.nvmrc`, `.node-version` or `engines`, and the install command from its lock file (npm, pnpm or yarn). It offers a Dependabot file for the pinned actions, runs actionlint when installed, and says that a check blocks a merge only when the branch requires it. An existing workflow gets a step instead of a second workflow.

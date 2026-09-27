@@ -4,7 +4,7 @@
 // (https://code.claude.com/docs/en/hooks). The generated files are the
 // `generated` globs of design-system/gates.json.
 
-import { editedFile, hookInput, matchesAny, readGates } from "./gates.mjs";
+import { editedFile, hookInput, matchesAny, readGates } from "../gates.mjs";
 
 const file = editedFile(hookInput());
 if (file === undefined) process.exit(0);

@@ -110,6 +110,18 @@ const readText = (root, file) => {
  * The inventory of the project at `root`.
  * @param {string} root
  */
+/**
+ * Where the plugin's harness is installed: `canonical` (design-system/harness, 0.7.0 on), `legacy-0.6`
+ * (.claude/hooks/design-system, 0.6.x), `legacy-0.5` (.claude/hooks/design-tokens, 0.5.x and before), or null
+ * when the plugin's harness is not installed (the project may still have its own). The upgrade reads it.
+ */
+export function harnessLayoutOf(files) {
+  if (files.includes("design-system/harness/run-gates.mjs")) return "canonical";
+  if (files.includes(".claude/hooks/design-system/run-gates.mjs")) return "legacy-0.6";
+  if (files.includes(".claude/hooks/design-tokens/run-gates.mjs")) return "legacy-0.5";
+  return null;
+}
+
 export function scanProject(root) {
   const files = listFiles(root);
   const has = (file) => files.includes(file);
@@ -153,7 +165,8 @@ export function scanProject(root) {
 
   const gates = {
     claudeSettings: [".claude/settings.json", ".claude/settings.local.json"].filter(has),
-    claudeHooks: files.filter((file) => file.startsWith(".claude/hooks/")),
+    claudeHooks: files.filter((file) => file.startsWith(".claude/hooks/") || file.startsWith("design-system/harness/")),
+    harnessLayout: harnessLayoutOf(files),
     gatesConfig: ["design-system/gates.json", "design-tokens.gates.json"].find(has) ?? null,
     // Husky keeps its own scripts in .husky/_/; the project's hooks are the files beside that folder.
     gitHooks: files.filter((file) => (/^(\.githooks|\.husky)\//.test(file) && !file.startsWith(".husky/_/")) || /^(lefthook|\.lefthook)\.ya?ml$/.test(file)),

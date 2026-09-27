@@ -17,7 +17,7 @@
 // PreToolUse hook only sees the Edit and Write tools, so this is where a shell
 // write to a generated file is caught before the commit.
 
-import { bashChangedFiles, block, editProblems, hookInput, readGates } from "./gates.mjs";
+import { bashChangedFiles, block, editProblems, hookInput, readGates } from "../gates.mjs";
 
 const files = bashChangedFiles(hookInput());
 if (files.length === 0) process.exit(0);

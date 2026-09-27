@@ -3,8 +3,8 @@
 // pre-commit hook and CI call it, so a person, an agent and CI pass the same
 // gates.
 //
-//   node .claude/hooks/design-system/run-gates.mjs before-commit
-//   node .claude/hooks/design-system/run-gates.mjs on-source-edit
+//   node design-system/harness/run-gates.mjs before-commit
+//   node design-system/harness/run-gates.mjs on-source-edit
 
 import { readGates, runAll } from "./gates.mjs";
 

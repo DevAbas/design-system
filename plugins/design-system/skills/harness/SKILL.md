@@ -49,9 +49,11 @@ A rule that nobody enforces is a rule that drifts (principles 8).
    - its CI workflows;
    - its lint config.
 
-   New gates join what exists. They never replace it.
+   The scan's `gates.harnessLayout` says whether the plugin's harness is installed and where: `canonical`, `legacy-0.6`, `legacy-0.5` or null. An older layout is upgraded first (Upgrading an installed harness). A project that runs its gates through its own hooks or scripts follows A project with its own harness.
 
 ## Step 1: Choose the gates with the user
+
+Start from the report's `gates`. For each gate that is `partial` or `missing`, list every gap its "Does" text and status explanation name, for example a check that does not read CSS, or that does not check a component's contract entry. Each gap is either closed by a gate you propose, or named with the reason it stays open. None is dropped silently.
 
 List each gate with:
 - what it does;
@@ -117,12 +119,14 @@ For a stack without a profile, the token and rules checks work as they are. Writ
 
 From `${CLAUDE_PLUGIN_ROOT}/assets/harness/core/`:
 
-1. **Hooks.** Copy `gates.mjs`, `protect-generated.mjs`, `check-on-edit.mjs`, `check-after-bash.mjs`, `guard-commit.mjs`, `run-gates.mjs` and `with-node.sh` to `.claude/hooks/design-system/`. Make `with-node.sh` executable. What each hook can do:
-   - `protect-generated` (PreToolUse, Edit and Write) denies an edit to a generated output before it happens.
-   - `check-on-edit` (PostToolUse, Edit and Write) and `check-after-bash` (PostToolUse, Bash) run after the file is written. They report the failure to the agent; they cannot undo the write. The commit gate is what enforces.
-   - `check-after-bash` reads the files a shell command changed (`sed`, a heredoc, a `node -e` script) from Claude Code's `tool_response.bashEditDiff` (v2.1.269 or later, public beta). Claude Code records it in auto and bypassPermissions mode when it has the agent edit through Bash, and in every mode when the person's own settings set `bashEditDiffEnabled: true`, which a project's settings cannot turn on (https://code.claude.com/docs/en/settings-reference). A command that changes a generated output also runs the source checks, so a shell write to it fails the staleness check at once. Without the list the hook passes, and the commit gate still holds.
+1. **Hooks.** The harness lives under `design-system/harness/` (`${CLAUDE_PLUGIN_ROOT}/references/conventions.md`), not under `.claude/`: pre-commit, CI and every agent run the same core.
+   - Copy `run-gates.mjs` and `gates.mjs` to `design-system/harness/`, and `claude/*` (`protect-generated.mjs`, `check-on-edit.mjs`, `check-after-bash.mjs`, `guard-commit.mjs`, `with-node.sh`) to `design-system/harness/claude/`. Make `with-node.sh` executable.
+   - What each Claude hook can do:
+     - `protect-generated` (PreToolUse, Edit and Write) denies an edit to a generated output before it happens.
+     - `check-on-edit` (PostToolUse, Edit and Write) and `check-after-bash` (PostToolUse, Bash) run after the file is written. They report the failure to the agent; they cannot undo the write. The commit gate is what enforces.
+     - `check-after-bash` reads the files a shell command changed (`sed`, a heredoc, a `node -e` script) from Claude Code's `tool_response.bashEditDiff` (v2.1.269 or later, public beta). Claude Code records it in auto and bypassPermissions mode when it has the agent edit through Bash, and in every mode when the person's own settings set `bashEditDiffEnabled: true`, which a project's settings cannot turn on (https://code.claude.com/docs/en/settings-reference). A command that changes a generated output also runs the source checks, so a shell write to it fails the staleness check at once. Without the list the hook passes, and the commit gate still holds.
 2. **Settings.** Merge `settings.hooks.json` into `.claude/settings.json`. Show the merged `hooks` object and wait for approval: settings change what runs on every edit.
-3. **Pre-commit.** Add `pre-commit` to the project's git hooks. If a pre-commit hook exists, add its last line to that hook instead. Ask before changing `core.hooksPath` or `package.json`.
+3. **Pre-commit.** Add `pre-commit` (it runs `node design-system/harness/run-gates.mjs before-commit`) to the project's git hooks. If a pre-commit hook exists, add its last line to that hook instead. Ask before changing `core.hooksPath` or `package.json`.
 4. **CI (optional).** Follow GitHub's own guidance ("Secure use reference", https://docs.github.com/en/actions/reference/security/secure-use). With an existing workflow, add one step running `run-gates.mjs before-commit` to its job instead of a second workflow. Otherwise start from `design-system.yml` and fill every placeholder:
    - **Branch:** the project's default branch, read from git (`git symbolic-ref refs/remotes/origin/HEAD`), never assumed `main`.
    - **Actions:** pin each to the full commit SHA of its latest release, the version in the comment. Find the release with `git ls-remote --tags --refs https://github.com/<owner>/<action>.git`, the highest `vX.Y.Z`; resolve it with `git ls-remote https://github.com/<owner>/<action>.git refs/tags/vX.Y.Z refs/tags/vX.Y.Z^{}`, taking the `^{}` commit when there is one. Never copy a SHA or a tag from this plugin.
@@ -133,6 +137,28 @@ From `${CLAUDE_PLUGIN_ROOT}/assets/harness/core/`:
    - **Lint:** run `actionlint` on the workflow when it is installed; when it is not, say so instead of installing it.
    - **Blocking:** a CI check blocks a merge only when the branch's protection or ruleset requires it. Tell the person to make the job's check (`Design-system gates`) required; it is a GitHub setting, theirs to change. A push straight to the default branch runs CI after the fact.
    - **Proof:** the first run on the pushed commit, its link or its status.
+
+## Upgrading an installed harness
+
+When the scan's `gates.harnessLayout` is `legacy-0.6` (`.claude/hooks/design-system/`) or `legacy-0.5` (`.claude/hooks/design-tokens/`), move it to the canonical layout before adding anything. The CHANGELOG records what each release changed; this procedure is how a project gets there.
+
+1. **Compare before replacing.** Diff each installed file against the plugin's current version. Lines the project adapted (a message naming its own commands, a path) are listed, shown to the person, and carried into the new file.
+2. **Move.** `git mv` `run-gates.mjs` and `gates.mjs` to `design-system/harness/`, and the Claude hooks to `design-system/harness/claude/`, then copy the plugin's current versions over them, with the adapted lines kept.
+3. **Repoint.** Update the paths in `.claude/settings.json` (show the merged `hooks` object for approval), the pre-commit hook, CI, the checks copied into `design-system/checks/` (copy the plugin's current ones), and the agent instructions and README.
+4. **No old path left.** `git grep -n ".claude/hooks/design-system"` (or `design-tokens`) finds nothing outside git history.
+5. **Prove** every gate as in Step 5, and ask for the live test in a new session: settings load when a session starts.
+
+## A project with its own harness
+
+A project may already run its gates through its own hooks or scripts, with paths and commands written into each file. Two installs of the same check would run it twice, so choose one:
+
+- **Migrate (recommended when the person agrees).** Write every check the project's hooks run into `design-system/gates.json`, with the same commands and globs, and install the plugin's hooks, which read that one config and add the Bash-edit check.
+  - Keep each check exactly as strict as it was. A message that names the project's own commands is kept, as an adapted line of the plugin's hook.
+  - Remove the project's own hook files only with the person's approval: removing code that looks redundant is theirs to decide.
+  - Prove it: each old check fails on its violation through the new hook, then passes.
+- **Keep theirs.** Add only the gates they lack, beside them, and name the checks the project's hooks already run so the plugin's hooks do not run them again.
+
+Never leave both running the same check.
 
 ## Step 5: Prove each gate
 
@@ -152,14 +178,14 @@ A hook run by hand proves its script, not that Claude Code loads it. The hooks l
 
 ## Step 6: Record
 
-- **Document.** Add the gates to the project's agent instructions (CLAUDE.md or AGENTS.md): what runs, when, and the one command to run them all (`node .claude/hooks/design-system/run-gates.mjs before-commit`).
+- **Document.** Add the gates to the project's agent instructions (CLAUDE.md or AGENTS.md): what runs, when, and the one command to run them all (`node design-system/harness/run-gates.mjs before-commit`).
 - **Commit message.** Propose one and wait for approval. Add no attribution trailers unless the project asks for them.
 
 ## Rules
 
 - **Search inside the project.** Search only the project, the plugin's files and the session scratchpad. Find where a tool writes its output from its config or documentation, never by searching the disk. A hook blocks searches outside those places (`${CLAUDE_PLUGIN_ROOT}/scripts/search-scope.mjs`).
 - **Approval before changes** to settings, git hooks, `package.json`, CI or dependencies.
-- **No weakening.** Never weaken an existing gate or lint rule to make a new one pass.
+- **No weakening.** Never weaken an existing gate or lint rule to make a new one pass. A migrated check stays exactly as strict.
 - **Existing tools first.** Custom checks only where no tool has the rule.
 - **Prove before reporting.** Every gate is shown failing before it is reported as installed.
 - **Say what a hook can do.** A PreToolUse hook prevents; a PostToolUse hook reports after the write. Never describe an after-the-fact check as a block.

@@ -12,7 +12,7 @@
 // changed through the shell (`sed`, a heredoc, a script) gets the same checks
 // from check-after-bash.mjs.
 
-import { block, editProblems, editedFile, hookInput, readGates } from "./gates.mjs";
+import { block, editProblems, editedFile, hookInput, readGates } from "../gates.mjs";
 
 const file = editedFile(hookInput());
 if (file === undefined) process.exit(0);

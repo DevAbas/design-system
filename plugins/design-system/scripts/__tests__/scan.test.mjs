@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { countRawColors, frontMatterKeys, isRulesDocumentCandidate, listFiles, scanProject } from "../scan.mjs";
+import { countRawColors, frontMatterKeys, harnessLayoutOf, isRulesDocumentCandidate, listFiles, scanProject } from "../scan.mjs";
 import { writeProjectFixture } from "./projectFixture.mjs";
 
 describe("countRawColors", () => {
@@ -94,5 +94,14 @@ describe("scanProject", () => {
     } finally {
       plain.cleanup();
     }
+  });
+});
+
+describe("harnessLayoutOf", () => {
+  it("tells the canonical layout from the two older ones, and a project without the plugin's harness", () => {
+    assert.equal(harnessLayoutOf(["design-system/harness/run-gates.mjs", "design-system/harness/claude/with-node.sh"]), "canonical");
+    assert.equal(harnessLayoutOf([".claude/hooks/design-system/run-gates.mjs"]), "legacy-0.6");
+    assert.equal(harnessLayoutOf([".claude/hooks/design-tokens/run-gates.mjs"]), "legacy-0.5");
+    assert.equal(harnessLayoutOf([".claude/hooks/lintEditedFile.mjs", ".githooks/pre-commit"]), null);
   });
 });

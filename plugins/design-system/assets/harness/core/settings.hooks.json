@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-system/with-node.sh protect-generated.mjs",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/design-system/harness/claude/with-node.sh protect-generated.mjs",
             "timeout": 15
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-system/with-node.sh guard-commit.mjs",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/design-system/harness/claude/with-node.sh guard-commit.mjs",
             "timeout": 300,
             "statusMessage": "Design-token gates before the commit…"
           }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-system/with-node.sh check-on-edit.mjs",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/design-system/harness/claude/with-node.sh check-on-edit.mjs",
             "timeout": 120,
             "statusMessage": "Design-token checks on the edited file…"
           }
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/design-system/with-node.sh check-after-bash.mjs",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/design-system/harness/claude/with-node.sh check-after-bash.mjs",
             "timeout": 120,
             "statusMessage": "Design-token checks on the files the command changed…"
           }
