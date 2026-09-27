@@ -21,7 +21,7 @@ What the plugin should do next, and why. Each item names the project run that sh
 ## Fix
 
 - **Every commit leaves the tree working.** A token migration and the code renames it needs belong in one commit; a commit with only the token change breaks rendering. The plan should group commits by that rule, not by finding. (ispanviza-web: the agent merged two planned commits for this reason)
-- **Visual verification for migrations.** The ispanviza-web batch captured computed styles (colour, background, border, shadow, font size, line height, weight, max-width) of every element on every route at two widths, plus screenshots and interaction states, before and after, and stopped on any difference. Make this the default proof for a batch that must not change rendering, run from the session scratchpad, never added to the project.
+- **Visual verification for migrations.** The ispanviza-web batch captured computed styles (colour, background, border, shadow, font size, line height, weight, max-width) of every element on every route at two widths, plus screenshots and interaction states, before and after, and stopped on any difference. Make this the default proof for a batch that must not change rendering, run from the session scratchpad, never added to the project. Diff the pre-rendered HTML too: on ispanviza-web every screenshot was identical while two routes lost a CTA link from the server HTML (the browser added it back), which only the HTML diff showed. And check the base build on its own: a comparison of two builds cannot see a fault both share.
 - **Confirm a fresh build before comparing reports.**
 
 ## Harness
