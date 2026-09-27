@@ -1,22 +1,41 @@
-# The design-token gates in CI: the same `beforeCommit` commands a person's
-# and an agent's commit run (design-system/gates.json). Copy to
-# .github/workflows/design-system.yml, then set the Node version and the
-# install command to the project's own.
+# The design-system gates in CI: the same `beforeCommit` commands a person's
+# and an agent's commit run (design-system/gates.json).
+#
+# A template: harness fills every <…> from the project and from each action's
+# latest release (skills/harness, Step 4, CI). A workflow with a placeholder
+# left in it never runs, so none is committed.
 name: design-system
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [<default-branch>]
+
+# Least privilege: the gates only read the repository (GitHub, "Secure use
+# reference": the GITHUB_TOKEN at read access for repository contents).
+permissions:
+  contents: read
+
+# A new push to the same branch or pull request cancels the run it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   gates:
+    name: Design-system gates
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Each action is pinned to the full commit SHA of its release, the
+      # version in the comment: a tag can move, a commit cannot (GitHub,
+      # "Secure use reference"). Dependabot keeps them current.
+      - uses: actions/checkout@<sha> # <version>
+      - uses: actions/setup-node@<sha> # <version>
         with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: node .claude/hooks/design-system/run-gates.mjs before-commit
+          <node-version-key>: <node-version-value>
+          cache: <package-manager>
+      - name: Install
+        run: <install-command>
+      - name: Design-system gates
+        run: node .claude/hooks/design-system/run-gates.mjs before-commit

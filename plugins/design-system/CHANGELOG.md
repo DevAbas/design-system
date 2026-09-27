@@ -7,6 +7,13 @@ A version bump means:
 - **Minor:** a new rule, gate, profile or skill.
 - **Patch:** a fix or a clarification.
 
+## 0.6.2
+
+- **CI follows GitHub's own guidance** ("Secure use reference"). The template grants the token read access to contents only, cancels a superseded run, has a time limit, and never uses `pull_request_target`. Harness pins each action to the full commit SHA of its latest release (read with `git ls-remote`, never copied from the plugin), takes the default branch from git, Node from the project's `.nvmrc`, `.node-version` or `engines`, and the install command from its lock file (npm, pnpm or yarn). It offers a Dependabot file for the pinned actions, runs actionlint when installed, and says that a check blocks a merge only when the branch requires it. An existing workflow gets a step instead of a second workflow.
+- Before, the template shipped `@v4` tags, which were two majors behind, assumed `main` and `.nvmrc`, and supported npm only.
+
+**Migrating from 0.6.1:** a workflow copied from the old template gets `permissions`, `concurrency`, `timeout-minutes` and SHA-pinned actions as above.
+
 ## 0.6.1
 
 - **`check-after-bash` is back, and 0.5.1 was wrong to remove it.** 0.5.1 said Claude Code rarely records the files a shell command changes in auto mode. The evidence was the agent's own tool results in one session, where the list is not shown. The transcripts of real auto-mode sessions on a production site show otherwise: every shell edit was recorded in `tool_response.bashEditDiff`, including a `node -e` script that rewrote a token file, `lib/site.ts` and a generated stylesheet in one command. With the hook removed, those edits reached no check before the commit.

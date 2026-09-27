@@ -123,7 +123,16 @@ From `${CLAUDE_PLUGIN_ROOT}/assets/harness/core/`:
    - `check-after-bash` reads the files a shell command changed (`sed`, a heredoc, a `node -e` script) from Claude Code's `tool_response.bashEditDiff` (v2.1.269 or later, public beta). Claude Code records it in auto and bypassPermissions mode when it has the agent edit through Bash, and in every mode when the person's own settings set `bashEditDiffEnabled: true`, which a project's settings cannot turn on (https://code.claude.com/docs/en/settings-reference). A command that changes a generated output also runs the source checks, so a shell write to it fails the staleness check at once. Without the list the hook passes, and the commit gate still holds.
 2. **Settings.** Merge `settings.hooks.json` into `.claude/settings.json`. Show the merged `hooks` object and wait for approval: settings change what runs on every edit.
 3. **Pre-commit.** Add `pre-commit` to the project's git hooks. If a pre-commit hook exists, add its last line to that hook instead. Ask before changing `core.hooksPath` or `package.json`.
-4. **CI (optional).** Copy `design-system.yml` to `.github/workflows/`, with the project's Node version and install command. Confirm the action versions in their documentation.
+4. **CI (optional).** Follow GitHub's own guidance ("Secure use reference", https://docs.github.com/en/actions/reference/security/secure-use). With an existing workflow, add one step running `run-gates.mjs before-commit` to its job instead of a second workflow. Otherwise start from `design-system.yml` and fill every placeholder:
+   - **Branch:** the project's default branch, read from git (`git symbolic-ref refs/remotes/origin/HEAD`), never assumed `main`.
+   - **Actions:** pin each to the full commit SHA of its latest release, the version in the comment. Find the release with `git ls-remote --tags --refs https://github.com/<owner>/<action>.git`, the highest `vX.Y.Z`; resolve it with `git ls-remote https://github.com/<owner>/<action>.git refs/tags/vX.Y.Z refs/tags/vX.Y.Z^{}`, taking the `^{}` commit when there is one. Never copy a SHA or a tag from this plugin.
+   - **Node:** `node-version-file` with the project's `.nvmrc` or `.node-version`, else `node-version` from `engines.node`; with none of these, ask.
+   - **Package manager**, from the lock file: npm `npm ci`, pnpm `pnpm install --frozen-lockfile` (with `pnpm/action-setup` before `setup-node`, pinned the same way), yarn `yarn install --immutable`; `cache` names the same manager.
+   - Keep `permissions: contents: read`, `concurrency` and `timeout-minutes`; never use `pull_request_target`.
+   - **Dependabot:** offer `dependabot.yml` for `.github/`, so the pinned SHAs stay current; it is a new file, so ask first, and merge into an existing `dependabot.yml`.
+   - **Lint:** run `actionlint` on the workflow when it is installed; when it is not, say so instead of installing it.
+   - **Blocking:** a CI check blocks a merge only when the branch's protection or ruleset requires it. Tell the person to make the job's check (`Design-system gates`) required; it is a GitHub setting, theirs to change. A push straight to the default branch runs CI after the fact.
+   - **Proof:** the first run on the pushed commit, its link or its status.
 
 ## Step 5: Prove each gate
 
