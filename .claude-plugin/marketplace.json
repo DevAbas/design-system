@@ -1,0 +1,15 @@
+{
+  "name": "abasturabli",
+  "description": "Design-system plugins for AI coding agents, by Abas Turabli",
+  "owner": {
+    "name": "Abas Turabli",
+    "url": "https://abasturabli.com"
+  },
+  "plugins": [
+    {
+      "name": "design-system",
+      "source": "./plugins/design-system",
+      "description": "Agent-Ready Design System: set up, audit, fix and gate a web project's design system so AI coding agents stay on it"
+    }
+  ]
+}

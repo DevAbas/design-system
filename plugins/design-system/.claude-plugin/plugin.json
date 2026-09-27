@@ -1,0 +1,23 @@
+{
+  "name": "design-system",
+  "displayName": "Agent-Ready Design System",
+  "version": "0.6.0",
+  "description": "Agent-Ready Design System: set up, audit, fix and gate a web project's design system so AI coding agents stay on it. W3C Design Tokens (DTCG) as the one source of values, a rules document that holds no values, and gates that keep the code on the tokens.",
+  "author": {
+    "name": "Abas Turabli",
+    "url": "https://abasturabli.com"
+  },
+  "homepage": "https://github.com/DevAbas/design-system",
+  "repository": "https://github.com/DevAbas/design-system",
+  "license": "MIT",
+  "keywords": [
+    "design-system",
+    "design-tokens",
+    "dtcg",
+    "ai-agents",
+    "claude-code",
+    "audit",
+    "terrazzo",
+    "tailwind"
+  ]
+}
