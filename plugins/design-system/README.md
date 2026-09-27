@@ -38,7 +38,7 @@ Read this before you install. The plugin is opinionated in two layers: standards
 | `audit` | Any web stack. On a project with DTCG files it also runs the token check, deterministically, with no install | Only its reports, in `design-system/audits/` |
 | `fix` | Any web stack | What the approved plan names. Every new dependency is asked for first |
 | `setup` | Web. It proposes the Terrazzo + Tailwind v4 profile, and other stacks choose a build tool with you | Token files, `DESIGN.md`, the build config, and the approved dependencies |
-| `harness`, core gates and checks | Any web stack that runs Node. The token check and the rules-document check are copied as plain scripts | `design-system/gates.json`, `design-system/checks/`, `design-system/harness/` (with `claude/` for the Claude Code hooks), a git pre-commit hook, an optional CI job. Changes to `.claude/settings.json`, git hooks, `package.json` or CI are asked for first |
+| `harness`, core gates and checks | Any web stack that runs Node. The token check and the rules-document check are copied as plain scripts | `design-system/gates.json`, `design-system/checks/`, `design-system/harness/` (the agent-agnostic core), `.claude/hooks/design-system/` (the Claude Code adapters), a git pre-commit hook, an optional CI job. Changes to `.claude/settings.json`, git hooks, `package.json` or CI are asked for first |
 | `harness`, profile checks | The profile below | The build staleness check and the ESLint rules, adapted from the plugin |
 
 ### Profile: Terrazzo + Tailwind CSS v4
@@ -91,6 +91,8 @@ While a skill of this plugin is in use, a hook keeps its searches inside the pro
 | `guard-commit` | Before an agent's `git commit` | Runs the commit gates and refuses the commit when one fails |
 
 A hook that runs after the tool reports; it cannot undo the write. The commit gates, for an agent, a person and CI, are what enforce.
+
+The hooks live in `.claude/hooks/design-system/` and only translate: each reads Claude Code's input, runs one stage of the core in `design-system/harness/`, and answers. Every decision is the core's, and nothing under `design-system/` names an agent, so another agent needs only its own adapters (`references/conventions.md`, The harness).
 
 ## The rubric
 

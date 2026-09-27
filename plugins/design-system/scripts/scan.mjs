@@ -111,11 +111,13 @@ const readText = (root, file) => {
  * @param {string} root
  */
 /**
- * Where the plugin's harness is installed: `canonical` (design-system/harness, 0.7.0 on), `legacy-0.6`
- * (.claude/hooks/design-system, 0.6.x), `legacy-0.5` (.claude/hooks/design-tokens, 0.5.x and before), or null
- * when the plugin's harness is not installed (the project may still have its own). The upgrade reads it.
+ * Where the plugin's harness is installed: `canonical` (the core in design-system/harness, each agent's adapters in
+ * its own folder, 0.8.0 on), `legacy-0.7` (the Claude Code adapters in design-system/harness/claude), `legacy-0.6`
+ * (.claude/hooks/design-system, 0.6.x), `legacy-0.5` (.claude/hooks/design-tokens, 0.5.x and before), or null when
+ * the plugin's harness is not installed (the project may still have its own). The upgrade reads it.
  */
 export function harnessLayoutOf(files) {
+  if (files.some((file) => file.startsWith("design-system/harness/claude/"))) return "legacy-0.7";
   if (files.includes("design-system/harness/run-gates.mjs")) return "canonical";
   if (files.includes(".claude/hooks/design-system/run-gates.mjs")) return "legacy-0.6";
   if (files.includes(".claude/hooks/design-tokens/run-gates.mjs")) return "legacy-0.5";

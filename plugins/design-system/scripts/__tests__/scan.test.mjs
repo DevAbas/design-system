@@ -98,8 +98,9 @@ describe("scanProject", () => {
 });
 
 describe("harnessLayoutOf", () => {
-  it("tells the canonical layout from the two older ones, and a project without the plugin's harness", () => {
-    assert.equal(harnessLayoutOf(["design-system/harness/run-gates.mjs", "design-system/harness/claude/with-node.sh"]), "canonical");
+  it("tells the canonical layout from the three older ones, and a project without the plugin's harness", () => {
+    assert.equal(harnessLayoutOf(["design-system/harness/run-gates.mjs", "design-system/harness/with-node.sh", ".claude/hooks/design-system/check-on-edit.mjs"]), "canonical");
+    assert.equal(harnessLayoutOf(["design-system/harness/run-gates.mjs", "design-system/harness/claude/with-node.sh"]), "legacy-0.7");
     assert.equal(harnessLayoutOf([".claude/hooks/design-system/run-gates.mjs"]), "legacy-0.6");
     assert.equal(harnessLayoutOf([".claude/hooks/design-tokens/run-gates.mjs"]), "legacy-0.5");
     assert.equal(harnessLayoutOf([".claude/hooks/lintEditedFile.mjs", ".githooks/pre-commit"]), null);

@@ -1,23 +1,32 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const core = new URL("../", import.meta.url);
+const read = (path, base = core) => readFileSync(new URL(path, base), "utf8");
+const claudeCode = new URL("../../adapters/claude-code/", import.meta.url);
 
 describe("the harness layout", () => {
-  it("points Claude Code, git and CI at design-system/harness, never at .claude/hooks", () => {
-    for (const file of ["settings.hooks.json", "pre-commit", "design-system.yml", "claude/with-node.sh", "run-gates.mjs"]) {
-      const text = read(file);
-      assert.doesNotMatch(text, /\.claude\/hooks/, file);
-      assert.match(text, /design-system\/harness\//, file);
-    }
+  it("keeps every agent out of the core, which lands in the project's design-system/harness", () => {
+    const files = readdirSync(core, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name);
+    for (const file of files) assert.doesNotMatch(read(file), /claude|cursor|codex|copilot|windsurf/i, file);
   });
 
-  it("runs every Claude hook through the adapter folder, and the gates through the one runner", () => {
-    const commands = JSON.parse(read("settings.hooks.json")).hooks;
-    const all = Object.values(commands).flat().flatMap((entry) => entry.hooks.map((hook) => hook.command));
-    for (const command of all) assert.match(command, /^"\$CLAUDE_PROJECT_DIR"\/design-system\/harness\/claude\/with-node\.sh [a-z-]+\.mjs$/);
-    assert.match(read("pre-commit"), /^node design-system\/harness\/run-gates\.mjs before-commit$/m);
+  it("points git, CI and the Claude Code settings at design-system/harness, and the settings at the adapters in .claude/hooks/design-system", () => {
+    assert.match(read("pre-commit"), /^"\$\(git rev-parse --show-toplevel\)"\/design-system\/harness\/with-node\.sh design-system\/harness\/run-gates\.mjs before-commit$/m);
     assert.match(read("design-system.yml"), /run: node design-system\/harness\/run-gates\.mjs before-commit/);
+    const hooks = JSON.parse(read("settings.hooks.json", claudeCode)).hooks;
+    const commands = Object.values(hooks).flat().flatMap((entry) => entry.hooks.map((hook) => hook.command));
+    assert.equal(commands.length, 4);
+    for (const command of commands) assert.match(command, /^"\$CLAUDE_PROJECT_DIR"\/design-system\/harness\/with-node\.sh \.claude\/hooks\/design-system\/[a-z-]+\.mjs$/);
+  });
+
+  it("has the adapters decide nothing: each imports the core's stages and answers through hook-io", () => {
+    for (const file of ["protect-generated.mjs", "check-on-edit.mjs", "check-after-bash.mjs", "guard-commit.mjs"]) {
+      const text = read(file, claudeCode);
+      assert.match(text, /from "\.\.\/\.\.\/\.\.\/design-system\/harness\/gates\.mjs"/, file);
+      assert.match(text, /STAGES\["[a-z-]+"\]/, file);
+      assert.doesNotMatch(text, /matchesAny|runAll|process\.exit|spawnSync/, file);
+    }
   });
 });

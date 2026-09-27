@@ -23,12 +23,18 @@ DTCG does not prescribe file names or group names: the spec "defines the format 
       themes/                                only when there are two or more contexts
         <context>.tokens.json                colors.<role> and shadow.<name> for that context
     checks/                                  the checks harness copies from the plugin (check-tokens.mjs, lib/, …)
-    harness/                                 how the gates run: run-gates.mjs (pre-commit, CI and agents call it), gates.mjs
-      claude/                                the Claude Code hooks; .claude/settings.json only points here
+    harness/                                 how the gates run, agent-agnostic: run-gates.mjs, gates.mjs, with-node.sh
     audits/                                  the audit reports, named by UTC stamp
     gates.json                               the gates and the token settings
   <framework path>/theme.css                 the generated output, where the framework reads it (app/, src/styles/)
+  .claude/hooks/design-system/               the Claude Code adapters; .claude/settings.json points here
 ```
+
+## The harness
+
+`design-system/` names no agent. The core in `design-system/harness/` makes every decision: which files are generated, which checks a changed file gets, what a commit runs. `gates.mjs` holds them as stages, and `run-gates.mjs` runs a stage from the command line (`before-commit`, `on-source-edit`, `check-files <file…>`, `check-generated <file…>`). The git hook and CI call it, and so can an agent whose hooks run a shell command. `with-node.sh` finds Node when a desktop app started the hook.
+
+Each agent's adapters live in that agent's own folder, for Claude Code `.claude/hooks/design-system/`. An adapter only translates: it reads the agent's hook input, calls one stage, and answers in the agent's protocol. A decision an adapter would make belongs in the core or in `design-system/gates.json`. So a new agent needs only its adapters, and `design-system/` does not change.
 
 ## Contexts
 

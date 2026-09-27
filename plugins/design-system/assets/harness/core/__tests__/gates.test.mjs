@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bashChangedFiles, editProblems, editedFile, gatesProblems, globToRegExp, isGitCommit, matchesAny } from "../gates.mjs";
+import { STAGES, checkFiles, gatesProblems, generatedReason, globToRegExp, isGitCommit, matchesAny, projectPaths } from "../gates.mjs";
 
 describe("globToRegExp", () => {
   it("lets ** span folders, including none", () => {
@@ -56,31 +56,26 @@ describe("gatesProblems", () => {
   });
 });
 
-describe("editedFile", () => {
-  it("makes the tool's path relative to the root", () => {
-    assert.equal(editedFile({ tool_input: { file_path: "/repo/src/a.tsx" } }, "/repo"), "src/a.tsx");
-    assert.equal(editedFile({ tool_input: {} }, "/repo"), undefined);
+describe("projectPaths", () => {
+  it("makes absolute and relative paths relative to the root, once each, and leaves out the rest", () => {
+    assert.deepEqual(projectPaths(["/repo/src/a.tsx", "src/a.tsx", "./lib/site.ts", "/elsewhere/x.tsx", "/repo", "", 7], "/repo"), ["src/a.tsx", "lib/site.ts"]);
   });
 });
 
-describe("bashChangedFiles", () => {
-  const input = (bashEditDiff) => ({ tool_name: "Bash", tool_input: { command: "node -e '…'" }, tool_response: { stdout: "", bashEditDiff } });
+describe("generatedReason", () => {
+  const gates = { generated: ["src/styles/*.generated.css"], onSourceEdit: ["npm run -s tokens:build"] };
 
-  it("reads Claude Code's changed-file list relative to the root, once each, in the shape a real session records", () => {
-    const recorded = { files: [{}, {}], moreFiles: 0, changedFiles: ["/repo/design-system/tokens/semantic/colors.tokens.json", "/repo/lib/site.ts", "/repo/styles/theme.generated.css", "/repo/lib/site.ts"] };
-    assert.deepEqual(bashChangedFiles(input(recorded), "/repo"), ["design-system/tokens/semantic/colors.tokens.json", "lib/site.ts", "styles/theme.generated.css"]);
+  it("names the first generated file and the build that writes it", () => {
+    assert.equal(generatedReason(["src/a.tsx", "/repo/src/styles/theme.generated.css"], gates, { root: "/repo" }), "src/styles/theme.generated.css is generated from the design tokens. Change the token files (or the build's template), then rebuild: npm run -s tokens:build.");
   });
 
-  it("gives nothing without a list, for a skipped diff, or for a path outside the root", () => {
-    assert.deepEqual(bashChangedFiles({ tool_response: { stdout: "" } }, "/repo"), []);
-    assert.deepEqual(bashChangedFiles(input({ skipped: true, changedFiles: ["/repo/src/a.tsx"] }), "/repo"), []);
-    assert.deepEqual(bashChangedFiles(input({ changedFiles: ["/elsewhere/x.tsx", "/repo", 7, ""] }), "/repo"), []);
-    assert.deepEqual(bashChangedFiles({}, "/repo"), []);
+  it("gives nothing when no file is generated", () => {
+    assert.equal(generatedReason(["src/a.tsx"], gates, { root: "/repo" }), undefined);
   });
 });
 
-describe("editProblems", () => {
-  const gates = { lint: { files: ["src/**/*.tsx"], command: "eslint", strictEnv: { DESIGN_LINT_STRICT: "1" } }, sources: ["design-system/tokens/**/*.json", "DESIGN.md"], onSourceEdit: ["tokens:build", "tokens:check"] };
+describe("checkFiles", () => {
+  const gates = { lint: { files: ["src/**/*.tsx"], command: "eslint", strictEnv: { DESIGN_LINT_STRICT: "1" } }, sources: ["design-system/tokens/**/*.json", "DESIGN.md"], generated: ["src/styles/*.generated.css"], onSourceEdit: ["tokens:build", "tokens:check"] };
   const recorder = ({ lintStatus = 0, failing } = {}) => {
     const calls = [];
     return {
@@ -96,24 +91,50 @@ describe("editProblems", () => {
 
   it("lints the files in lint.files that still exist, in one call with the strict environment", () => {
     const { calls, options } = recorder();
-    assert.equal(editProblems(["src/a.tsx", "src/b.tsx", "src/deleted.tsx", "README.md"], gates, options), undefined);
+    assert.equal(checkFiles(["src/a.tsx", "src/b.tsx", "src/deleted.tsx", "README.md"], gates, options), undefined);
     assert.deepEqual(calls, [{ command: 'eslint "src/a.tsx" "src/b.tsx"', env: { DESIGN_LINT_STRICT: "1" } }]);
   });
 
   it("runs onSourceEdit once however many sources changed", () => {
     const { calls, options } = recorder();
-    editProblems(["DESIGN.md", "design-system/tokens/semantic/colors.tokens.json"], gates, options);
+    checkFiles(["DESIGN.md", "design-system/tokens/semantic/colors.tokens.json"], gates, options);
     assert.deepEqual(calls, [{ commands: ["tokens:build", "tokens:check"] }]);
   });
 
   it("returns the lint failure, and the source failure, as the message the agent reads", () => {
-    assert.match(editProblems(["src/a.tsx"], gates, recorder({ lintStatus: 1 }).options), /^The design lint failed for src\/a\.tsx:\n1:1 error design\/no-raw-color/);
-    assert.match(editProblems(["DESIGN.md"], gates, recorder({ failing: "tokens:check" }).options), /^After editing DESIGN\.md, `tokens:check` failed:\n3 problems/);
+    assert.match(checkFiles(["src/a.tsx"], gates, recorder({ lintStatus: 1 }).options), /^The design lint failed for src\/a\.tsx:\n1:1 error design\/no-raw-color/);
+    assert.match(checkFiles(["DESIGN.md"], gates, recorder({ failing: "tokens:check" }).options), /^After editing DESIGN\.md, `tokens:check` failed:\n3 problems/);
+  });
+
+  it("runs onSourceEdit for a changed generated output, so a hand edit fails the staleness check", () => {
+    const { calls, options } = recorder();
+    checkFiles(["/repo/src/styles/theme.generated.css"], gates, options);
+    assert.deepEqual(calls, [{ commands: ["tokens:build", "tokens:check"] }]);
   });
 
   it("runs nothing for files no gate covers", () => {
     const { calls, options } = recorder();
-    assert.equal(editProblems(["README.md", "src/deleted.tsx"], gates, options), undefined);
+    assert.equal(checkFiles(["README.md", "src/deleted.tsx"], gates, options), undefined);
     assert.deepEqual(calls, []);
+  });
+});
+
+describe("STAGES", () => {
+  const gates = { beforeCommit: ["lint", "typecheck"], onSourceEdit: ["tokens:check"], generated: ["out/*.css"] };
+  const runner = (failing) => {
+    const calls = [];
+    return { calls, options: { root: "/repo", runCommands: (commands, env) => (calls.push({ commands, env }), failing ? { command: failing, output: "2 errors" } : undefined) } };
+  };
+
+  it("runs each config key with the design rules as errors, and names the failing command", () => {
+    const passing = runner();
+    assert.equal(STAGES["before-commit"](gates, [], passing.options), undefined);
+    assert.deepEqual(passing.calls, [{ commands: ["lint", "typecheck"], env: { DESIGN_LINT_STRICT: "1" } }]);
+    assert.equal(STAGES["on-source-edit"](gates, [], runner("tokens:check").options), "`tokens:check` failed:\n2 errors");
+  });
+
+  it("gives the file stages the paths they were called with", () => {
+    assert.match(STAGES["check-generated"](gates, ["/repo/out/theme.css"], { root: "/repo" }), /^out\/theme\.css is generated/);
+    assert.equal(STAGES["check-files"](gates, ["README.md"], { root: "/repo" }), undefined);
   });
 });

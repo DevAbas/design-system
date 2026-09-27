@@ -1,13 +1,11 @@
-// What the design-token gates share: the project's gates config
-// (design-system/gates.json; design-tokens.gates.json at the root before 0.4.0),
-// glob matching, the hook's JSON input, the checks an edited file gets, and
-// running a command. Copied into a project by /design-system:harness; the
-// config, not this file, is what a project edits.
-//
-// Claude Code hooks read exit code 2 as "blocked", and feed stderr back to the
-// agent (https://code.claude.com/docs/en/hooks). A PreToolUse block stops the
-// tool call; a PostToolUse one comes after the tool ran, so it reports and the
-// commit gate is what enforces. No dependencies, Node 20 or later.
+// The design-system gates, with every decision they make: the project's gates
+// config (design-system/gates.json; design-tokens.gates.json at the root
+// before 0.4.0), glob matching, which files are generated, the checks a
+// changed file gets, and what a commit runs. The git hook, CI and each agent's
+// adapter call the same stages (STAGES), through run-gates.mjs or by import;
+// an adapter only translates its agent's input and answer. Copied into a
+// project by /design-system:harness; the config, not this file, is what a
+// project edits. No dependencies, Node 20 or later.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -89,58 +87,72 @@ export function readGates(root = process.cwd()) {
   return config;
 }
 
-/** The hook's JSON input from stdin; `{}` when stdin is empty. */
-export function hookInput() {
-  const raw = readFileSync(0, "utf8").trim();
-  return raw ? JSON.parse(raw) : {};
-}
-
-/** The edited file relative to `root`, forward slashes; undefined when the tool call has none. */
-export function editedFile(input, root = process.cwd()) {
-  const file = input?.tool_input?.file_path;
-  if (typeof file !== "string" || !file) return undefined;
-  return relative(root, resolve(root, file)).split("\\").join("/");
-}
-
-/** `file` relative to `root`, forward slashes; undefined when it is outside the root. */
-function projectPath(file, root) {
+/** `file` relative to `root`, forward slashes; undefined when it is outside the root or is the root. */
+export function projectPath(file, root = process.cwd()) {
   const path = relative(root, resolve(root, file)).split("\\").join("/");
   return path && path !== ".." && !path.startsWith("../") && !isAbsolute(path) ? path : undefined;
 }
 
-/**
- * The files a Bash command changed, relative to `root`: Claude Code's `tool_response.bashEditDiff.changedFiles`
- * (https://code.claude.com/docs/en/hooks, Bash; v2.1.269 or later, public beta). Empty when the input has no
- * diff (recording is off, or the command ran in the background) or the diff was skipped (a command that moves
- * the working tree, such as `git checkout`). Files outside the root are left out.
- */
-export function bashChangedFiles(input, root = process.cwd()) {
-  const diff = input?.tool_response?.bashEditDiff;
-  if (!diff || diff.skipped || !Array.isArray(diff.changedFiles)) return [];
-  const files = diff.changedFiles.filter((file) => typeof file === "string" && file).map((file) => projectPath(file, root));
-  return [...new Set(files.filter((file) => file !== undefined))];
+/** The paths a caller passed, relative to `root`, once each; paths outside the root are left out. */
+export function projectPaths(files, root = process.cwd()) {
+  const paths = files.filter((file) => typeof file === "string" && file).map((file) => projectPath(file, root));
+  return [...new Set(paths.filter((path) => path !== undefined))];
 }
 
 /**
- * The checks an edited file gets, for one file or many: the files in `lint.files` that still exist are linted in
- * one `lint.command` call (the files are its last arguments), and `onSourceEdit` runs once when any file is in
- * `sources`. The first failure as the message the agent reads, or undefined when every check passes.
- * @param {string[]} files relative to the root
+ * The checks a changed file gets, for one file or many, absolute or relative: the files in `lint.files` that still
+ * exist are linted in one `lint.command` call (the files are its last arguments), and `onSourceEdit` runs once when
+ * any file is in `sources` or `generated`. A generated output passes the staleness check when the build wrote it and
+ * fails it when a hand did. The first failure as a message, or undefined when every check passes.
+ * @param {string[]} files
  * @param {Record<string, any>} gates
  */
-export function editProblems(files, gates, { root = process.cwd(), exists = (file) => existsSync(join(root, file)), runCommand = run, runCommands = runAll } = {}) {
-  const lintable = gates.lint ? files.filter((file) => matchesAny(file, gates.lint.files) && exists(file)) : [];
+export function checkFiles(files, gates, { root = process.cwd(), exists = (file) => existsSync(join(root, file)), runCommand = run, runCommands = runAll } = {}) {
+  const paths = projectPaths(files, root);
+  const lintable = gates.lint ? paths.filter((file) => matchesAny(file, gates.lint.files) && exists(file)) : [];
   if (lintable.length > 0) {
     const result = runCommand(`${gates.lint.command} ${lintable.map((file) => JSON.stringify(file)).join(" ")}`, gates.lint.strictEnv ?? {}, root);
     if (result.status !== 0) return `The design lint failed for ${lintable.join(", ")}:\n${result.output}`;
   }
-  const source = files.find((file) => matchesAny(file, gates.sources));
+  const source = paths.find((file) => matchesAny(file, gates.sources) || matchesAny(file, gates.generated));
   if (source !== undefined) {
     const failure = runCommands(gates.onSourceEdit, {}, root);
     if (failure) return `After editing ${source}, \`${failure.command}\` failed:\n${failure.output}\nValues live in the token files; rebuild the outputs instead of editing them.`;
   }
   return undefined;
 }
+
+/**
+ * Why a file must not be edited by hand, for the first of `files` in `generated`; undefined when none is.
+ * @param {string[]} files
+ * @param {Record<string, any>} gates
+ */
+export function generatedReason(files, gates, { root = process.cwd() } = {}) {
+  const file = projectPaths(files, root).find((path) => matchesAny(path, gates.generated));
+  if (file === undefined) return undefined;
+  return `${file} is generated from the design tokens. Change the token files (or the build's template), then rebuild: ${gates.onSourceEdit?.[0] ?? "the token build"}.`;
+}
+
+/** The environment a stage's commands run in: the design lint rules as errors. */
+const STRICT_ENV = { DESIGN_LINT_STRICT: "1" };
+
+/** The commands of one config key, in order; the first failure as a message, or undefined when all pass. */
+function commandsProblem(commands, { root = process.cwd(), runCommands = runAll } = {}) {
+  const failure = runCommands(commands, STRICT_ENV, root);
+  return failure ? `\`${failure.command}\` failed:\n${failure.output}` : undefined;
+}
+
+/**
+ * The stages every caller shares: the git hook and CI through run-gates.mjs, an agent's adapter by import.
+ * Each takes the gates, the paths it was given (absolute or relative) and options, and returns a message on
+ * failure, or undefined.
+ */
+export const STAGES = {
+  "before-commit": (gates, _files, options) => commandsProblem(gates.beforeCommit, options),
+  "on-source-edit": (gates, _files, options) => commandsProblem(gates.onSourceEdit, options),
+  "check-files": (gates, files, options) => checkFiles(files, gates, options),
+  "check-generated": (gates, files, options) => generatedReason(files, gates, options),
+};
 
 /** Runs a shell command at `root`, the project's node_modules/.bin first on PATH. */
 export function run(command, env = {}, root = process.cwd()) {
@@ -160,10 +172,4 @@ export function runAll(commands = [], env = {}, root = process.cwd()) {
     if (result.status !== 0) return { command, output: result.output };
   }
   return undefined;
-}
-
-/** Blocks the action: the message reaches the agent as the reason. */
-export function block(message) {
-  process.stderr.write(`${message.trimEnd()}\n`);
-  process.exit(2);
 }

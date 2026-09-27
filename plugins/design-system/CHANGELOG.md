@@ -7,6 +7,18 @@ A version bump means:
 - **Minor:** a new rule, gate, profile or skill.
 - **Patch:** a fix or a clarification.
 
+## 0.8.0
+
+Nothing under `design-system/` names an agent. The core decides, and each agent's adapters only translate.
+
+- **Layout.** `design-system/harness/` holds the core: `gates.mjs` with every decision as a stage, `run-gates.mjs` to run a stage from the command line, and `with-node.sh`, which finds Node for a hook a desktop app started. The Claude Code hooks move from `design-system/harness/claude/` to `.claude/hooks/design-system/`, Claude Code's own folder. In 0.7.0 the design system's folder held one agent's name and protocol; a second agent would have added another.
+- **The adapters decide nothing.** The generated-file reason and the rule that a changed generated output runs the staleness check were in the Claude hooks, so another agent would have had to copy them. They are core stages now (`check-generated`, `check-files`), beside `before-commit` and `on-source-edit`. The four hooks read Claude Code's JSON through `hook-io.mjs`, call one stage, and answer. Claude Code's protocol (the hook JSON, exit 2, the deny decision) left `gates.mjs`.
+- **One way to find Node, and it works without `.nvmrc`.** The pre-commit hook runs the gates through `with-node.sh` instead of its own copy of the nvm fallback. That fallback ended the script under `set -e` when a project had no `.nvmrc`: `nvm use` failed as the last command of an `&&` list, though loading nvm had already put its default Node on PATH. A person whose terminal had no Node on PATH, or a hook started by a desktop app, got exit 127 instead of the gates. A failed `nvm use` now leaves nvm's default in place.
+- **Tests hold it.** No file of the core mentions an agent. Every settings command runs a script in `.claude/hooks/design-system/` through `design-system/harness/with-node.sh`, and no adapter matches a glob, runs a command or exits on its own.
+- The scan reports the 0.7.0 layout as `legacy-0.7`, and the upgrade section moves it.
+
+**Upgrading from 0.7.x or earlier:** run `/design-system:harness`. It finds the old layout and follows the upgrade section.
+
 ## 0.7.0
 
 The harness lives with the rest of the design system, and an installed one can be upgraded without hand-written notes.
